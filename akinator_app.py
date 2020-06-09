@@ -1,8 +1,8 @@
 from datetime import datetime
 import logging
 
-from rhasspyhermes_app import HermesApp, TopicData
-from rhasspyhermes.dialogue import DialogueContinueSession, DialogueEndSession
+from rhasspyhermes_app import HermesApp, TopicData, ContinueSession, EndSession
+from rhasspyhermes.dialogue import DialogueContinueSession
 
 from akinatorNodeWrapper import AkinatorSession, Answer
 import codecs
@@ -23,18 +23,18 @@ intent_filter = ["AnswerYes", "AnswerNo", "AnswerDontKnow", "AnswerProbably", "A
 def handle_answer(answer, session_id):
     akinator = akinator_sessions.get(session_id)
     if not akinator:
-        return app.EndSession(text="Es läuft noch kein Spiel. Sage Starte Akinator um ein neues spiel zu starten")
+        return EndSession(text="Es läuft noch kein Spiel. Sage Starte Akinator um ein neues spiel zu starten")
     try:
         akinator.answer(answer)
         finished, text = akinator.next()
         if not finished:
-            return app.ContinueSession(text=text, intent_filter=intent_filter, send_intent_not_recognized=True)
+            return ContinueSession(text=text, intent_filter=intent_filter, send_intent_not_recognized=True)
         else:
-            return app.EndSession(text="Du hast an folgende Person gedacht: " + text)
+            return EndSession(text="Du hast an folgende Person gedacht: " + text)
     except Exception as e:
         _LOGGER.exception(e)
         del akinator_sessions[session_id]
-        app.EndSession(text="Es gab einen Fehler. Das spiel wird beendet")
+        EndSession(text="Es gab einen Fehler. Das spiel wird beendet")
         akinator.stop()
 
 
@@ -62,10 +62,10 @@ def handle_probably_not(intent):
 def handle_stop(intent):
     akinator = akinator_sessions.get(intent.session_id)
     if not akinator:
-        return app.EndSession(text="Es läuft noch kein Spiel. Sage Starte Akinator um ein neues spiel zu starten")
+        return EndSession(text="Es läuft noch kein Spiel. Sage Starte Akinator um ein neues spiel zu starten")
     akinator_sessions[intent.session_id].stop()
     del akinator_sessions[intent.session_id]
-    return app.EndSession(text="Vielen Dank fürs spielen")
+    return EndSession(text="Vielen Dank fürs spielen")
 
 
 @app.on_intent("StartAkinator")
@@ -75,7 +75,7 @@ def start_akinator(intent):
     akinator.start_game()
     _, question = akinator.next()
     intro = "Bitte denke an eine Person. ich werde sie erraten. Die erste Frage lautet: "
-    return app.ContinueSession(text=intro+question, intent_filter=intent_filter, send_intent_not_recognized=True )
+    return ContinueSession(text=intro+question, intent_filter=intent_filter, send_intent_not_recognized=True )
 
 @app.on_topic("hermes/dialogueManager/intentNotRecognized")
 def intent_not_recognized(data: TopicData, payload: bytes):
