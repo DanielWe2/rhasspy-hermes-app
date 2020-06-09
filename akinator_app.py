@@ -1,9 +1,12 @@
 from datetime import datetime
 import logging
 
-from rhasspyhermes_app import HermesApp
+from rhasspyhermes_app import HermesApp, TopicData
+from rhasspyhermes.dialogue import DialogueContinueSession, DialogueEndSession
 
 from akinatorNodeWrapper import AkinatorSession, Answer
+import codecs
+import json
 
 _LOGGER = logging.getLogger("AkinatorApp")
 _LOGGER.setLevel(logging.DEBUG)
@@ -25,7 +28,7 @@ def handle_answer(answer, session_id):
         akinator.answer(answer)
         finished, text = akinator.next()
         if not finished:
-            return app.ContinueSession(text=text, intent_filter=intent_filter)
+            return app.ContinueSession(text=text, intent_filter=intent_filter, send_intent_not_recognized=True)
         else:
             return app.EndSession(text="Du hast an folgende Person gedacht: " + text)
     except Exception as e:
@@ -72,6 +75,27 @@ def start_akinator(intent):
     akinator.start_game()
     _, question = akinator.next()
     intro = "Bitte denke an eine Person. ich werde sie erraten. Die erste Frage lautet: "
-    return app.ContinueSession(text=intro+question, intent_filter=intent_filter )
+    return app.ContinueSession(text=intro+question, intent_filter=intent_filter, send_intent_not_recognized=True )
+
+@app.on_topic("hermes/dialogueManager/intentNotRecognized")
+def intent_not_recognized(data: TopicData, payload: bytes):
+    _LOGGER.debug("not recognized: " + str(data) + str(payload))
+
+    payload_json = json.loads(payload.decode("utf-8"))
+    session_id = payload_json.get("sessionId")
+    site_id = payload_json.get("siteId")
+    if session_id in akinator_sessions:
+        text = 'Das habe ich nicht verstanden'
+        app.publish(
+            DialogueContinueSession(
+                session_id=session_id,
+                site_id=site_id,
+                text=text,
+                intent_filter=intent_filter,
+                custom_data=None,
+                send_intent_not_recognized=True,
+                slot=None
+                )
+        )
 
 app.run()
